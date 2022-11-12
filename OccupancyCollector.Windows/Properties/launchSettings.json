@@ -1,0 +1,10 @@
+{
+	"profiles": {
+		"OccupancyCollector.Windows (Package)": {
+			"commandName": "MsixPackage"
+		},
+		"OccupancyCollector.Windows (Unpackaged)": {
+			"commandName": "Project"
+		}
+	}
+}
