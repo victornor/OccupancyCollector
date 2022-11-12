@@ -1,0 +1,14 @@
+{
+  "solution": {
+    "path": "OccupancyCollector.sln",
+    "projects": [
+		"OccupancyCollector.Shared\\OccupancyCollector.Shared.shproj",
+
+		"OccupancyCollector.Mobile\\OccupancyCollector.Mobile.csproj",
+
+		"OccupancyCollector.Wasm\\OccupancyCollector.Wasm.csproj",
+
+		"OccupancyCollector.Skia.Gtk\\OccupancyCollector.Skia.Gtk.csproj",
+    ]
+  }
+}
