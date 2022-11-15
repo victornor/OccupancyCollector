@@ -7,6 +7,10 @@
 
 	<ItemGroup>
 	  <PackageReference Include="Uno.Wasm.Bootstrap.Server" Version="7.0.7" />
+	  <PackageReference Include="ZigBeeNet" Version="1.5.0" />
+	  <PackageReference Include="ZigBeeNet.DataStore.Json" Version="1.5.0" />
+	  <PackageReference Include="ZigBeeNet.Hardware.TI.CC2531" Version="1.5.0" />
+	  <PackageReference Include="ZigBeeNet.Transport.SerialPort" Version="1.5.0" />
 	</ItemGroup>
 
 
