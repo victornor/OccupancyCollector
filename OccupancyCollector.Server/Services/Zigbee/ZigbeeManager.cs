@@ -1,9 +1,13 @@
+using System.Collections.Concurrent;
+using System.Collections.Generic;
+using System.Linq;
 using System.Runtime.InteropServices.ComTypes;
 using System.Threading;
 using System.Threading.Tasks;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.Logging;
 using OccupancyCollector.Services.Zigbee.Listeners;
+using OccupancyCollector.Services.Zigbee.Models;
 using ZigBeeNet;
 using ZigBeeNet.App.Basic;
 using ZigBeeNet.App.Discovery;
@@ -11,16 +15,19 @@ using ZigBeeNet.App.IasClient;
 using ZigBeeNet.DataStore.Json;
 using ZigBeeNet.Hardware.TI.CC2531;
 using ZigBeeNet.Tranport.SerialPort;
+using ZigBeeNet.ZCL.Clusters.General;
 
 namespace OccupancyCollector.Services.Zigbee;
 
 public class ZigbeeManager
 {
-    private ILogger<ZigbeeManager> _logger;
-    private IConfiguration _configuration;
+    private readonly ILogger<ZigbeeManager> _logger;
+    private readonly IConfiguration _configuration;
 
     private ZigBeeNetworkManager _networkManager;
     private ZigBeeNode _coordinatorNode;
+
+    private readonly List<OccupancySensor> _sensors = new List<OccupancySensor>();
 
     public ZigbeeManager(ILogger<ZigbeeManager> logger, IConfiguration configuration)
     {
@@ -57,10 +64,42 @@ public class ZigbeeManager
         _networkManager.AddSupportedClientCluster(ZclOccupancySensingCluster.CLUSTER_ID);
 
         // Add listeners
-        _networkManager.AddCommandListener(new CommandListener(command => _logger.LogInformation($"Received Command: {command}")));
+        _networkManager.AddCommandListener(new CommandListener(command =>
+        {
+            _logger.LogInformation($"Received Command: {command}");
+            
+            if(command is ReportAttributesCommand)
+            {
+                var attribruteReport = (ReportAttributesCommand)command;
+                var sourceAddress = attribruteReport.SourceAddress.Address;
+
+                switch (attribruteReport.ClusterId)
+                {
+                    case 1024:
+                        UpdateSensor(
+                            _networkManager.Nodes.First(n => n.NetworkAddress == sourceAddress).IeeeAddress.ToString(),
+                            int.Parse(attribruteReport.Reports[0].AttributeValue.ToString()), null);
+                        break;
+                    case 1030:
+                        UpdateSensor(
+                            _networkManager.Nodes.First(n => n.NetworkAddress == sourceAddress).IeeeAddress.ToString(),
+                            null, (byte)attribruteReport.Reports[0].AttributeValue == 1);
+                        break;
+                }
+            }
+            
+        }));
         _networkManager.AddNetworkNodeListener(new NetworkNodeListener(
-            node => _logger.LogInformation($"Added new node: {node.IeeeAddress}"),
-            node => _logger.LogInformation($"Removed node: {node.IeeeAddress}"),
+            node =>
+            {
+                _logger.LogInformation($"Added new node: {node.IeeeAddress}");
+                UpdateSensor(node.IeeeAddress.ToString(), 0, false);
+            },
+            node =>
+            {
+                _logger.LogInformation($"Removed node: {node.IeeeAddress}");
+                RemoveSensor(node);
+            },
             node => _logger.LogInformation($"Updated node: {node.IeeeAddress}")));
 
         _networkManager.Initialize();
@@ -71,10 +110,42 @@ public class ZigbeeManager
         return _networkManager.Startup(false);
     }
 
+    private void RemoveSensor(ZigBeeNode node)
+    {
+        lock (_sensors)
+            _sensors.Remove(_sensors.First(s => s.Id == node.IeeeAddress.ToString()));
+    }
+    
+    private void UpdateSensor(string nodeIeee, int? illuminance, bool? occupied)
+    {
+        lock (_sensors)
+        {
+            var sensor = _sensors.FirstOrDefault(s => s.Id == nodeIeee);
+            if (sensor == null)
+            {
+                // Add sensor
+                sensor = new OccupancySensor(nodeIeee, illuminance ?? 0, occupied ?? false);
+                _sensors.Add(sensor);
+            }
+            else
+            {
+                // Update sensor
+                sensor.Illuminance = illuminance ?? sensor.Illuminance;
+                sensor.Occupied = occupied ?? sensor.Occupied;
+            }
+        }
+    }
+    
     public void PermitNetworkJoining(bool permit)
     {
         _coordinatorNode.PermitJoin(permit);
         _logger.LogInformation($"Network joining {(permit ? "enabled" : "disabled")}");
     }
-    
+
+    public IEnumerable<OccupancySensor> GetSensors()
+    {
+        lock (_sensors)
+            return _sensors.ToList();
+    }
+
 }

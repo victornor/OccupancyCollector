@@ -42,7 +42,7 @@ namespace OccupancyCollector
 				throw new Exception($"Failed to start zigbee network: {networkStatus}");
 			
 			// TODO: Remove and call through api
-			Thread.Sleep(30000);
+			Thread.Sleep(15000);
 			zigbeeManager.PermitNetworkJoining(true);
 
 			// Configure the HTTP request pipeline.
