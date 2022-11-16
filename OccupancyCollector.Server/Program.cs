@@ -5,6 +5,8 @@ using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 using OccupancyCollector.Services.Zigbee;
+using OccupancyCollector.Services.Zigbee.Abstractions;
+using OccupancyCollector.Services.Zigbee.StateHandlers;
 using Serilog;
 using Serilog.Events;
 using Uno.Wasm.Bootstrap.Server;
@@ -24,20 +26,26 @@ namespace OccupancyCollector
 			// Check required args
 			if (builder.Configuration.GetValue<string>("port") == null)
 				throw new Exception("Missing argument: port");
+
+			if (builder.Configuration.GetValue<int>("occupancy-timeout") == 0)
+				throw new Exception("Missing argument: occupancy-timeout");
 			
 			// Add services to the container.
 			builder.Services.AddControllers();
-			builder.Services.AddSingleton<ZigbeeManager>();
+			builder.Services.AddSingleton<IZigbeeManager, ZigbeeManager>();
 
 			var app = builder.Build();
 			
-			
 			// Initialize zigbee network
 			LogManager.SetFactory(app.Services.GetRequiredService<ILoggerFactory>());
-			var zigbeeManager = app.Services.GetRequiredService<ZigbeeManager>();
+			var zigbeeManager = app.Services.GetRequiredService<IZigbeeManager>();
 			var dongle = zigbeeManager.PrepareDongle();
 			var networkStatus = zigbeeManager.Initialize(dongle);
 
+			// Register sensor state handlers
+			zigbeeManager.RegisterSensorStateHandler(new ConsoleStateHandler());
+			zigbeeManager.RegisterSensorStateHandler(new LoggingStateHandler("sensor.log"));
+			
 			if (networkStatus != ZigBeeStatus.SUCCESS)
 				throw new Exception($"Failed to start zigbee network: {networkStatus}");
 			
