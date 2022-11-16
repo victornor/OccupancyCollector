@@ -1,3 +1,4 @@
+using System;
 using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.Linq;
@@ -130,6 +131,7 @@ public class ZigbeeManager
             else
             {
                 // Update sensor
+                sensor.LastUpdate = DateTime.Now;
                 sensor.Illuminance = illuminance ?? sensor.Illuminance;
                 sensor.Occupied = occupied ?? sensor.Occupied;
             }
